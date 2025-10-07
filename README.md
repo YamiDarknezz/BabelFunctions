@@ -1,6 +1,6 @@
 # BabelSpeak Functions
 
-Esta carpeta contiene la función de Appwrite para **transcripción y traducción de audio** usando Groq, junto con el registro de historial en Appwrite.
+Esta carpeta contiene la función de Appwrite para **transcripción y traducción de audio** usando Groq, junto con el registro de historial en Appwrite y manejo de archivos temporales en un bucket de Storage.
 
 ---
 
@@ -36,13 +36,23 @@ cp .env.example .env
 
 2. Rellena las variables:
 
+```env
+GROQ_API_KEY=TU_GROQ_API_KEY_AQUI
+APPWRITE_FUNCTION_API_ENDPOINT=TU_APPWRITE_ENDPOINT_AQUI
+APPWRITE_FUNCTION_PROJECT_ID=TU_PROJECT_ID_AQUI
+APPWRITE_FUNCTION_API_KEY=TU_FUNCTION_API_KEY_AQUI
+
+# Storage & DB
+BUCKET_ID=TU_BUCKET_ID_AQUI
+DATABASE_ID=TU_DATABASE_ID_AQUI
+COLLECTION_ID=TU_COLLECTION_ID_AQUI
+
+# Modelos Groq
+TRANSCRIPTION_MODEL=whisper-large-v3
+TRANSLATION_MODEL=llama-3.3-70b-versatile
 ```
-GROQ_API_KEY=your_groq_api_key_here
-APPWRITE_FUNCTION_API_ENDPOINT=https://cloud.appwrite.io/v1
-APPWRITE_FUNCTION_PROJECT_ID=your_project_id
-APPWRITE_FUNCTION_API_KEY=your_function_api_key
-PORT=5000   # Opcional si se prueba localmente
-```
+
+> Nota: reemplaza todos los valores por tus propios IDs y claves.
 
 ---
 
@@ -55,8 +65,9 @@ pip install -r requirements.txt
 **requirements.txt:**
 
 ```
-groq==0.31.0
 appwrite==13.2.0
+groq==0.31.0
+python-multipart==0.0.20
 ```
 
 ---
@@ -71,12 +82,15 @@ appwrite==13.2.0
 
 ```json
 {
-  "tipo": "es",  # "es" = solo transcripción, "en" = transcripción + traducción
+  "file_id": "ID_DEL_ARCHIVO_SUBIDO_AL_BUCKET",
+  "tipo": "es",       # "es" = solo transcripción, "en" = transcripción + traducción
   "user_id": "usuario123"
 }
 ```
 
-y el archivo de audio en `multipart/form-data` bajo la clave `audio`.
+- La función descargará el archivo desde el bucket configurado, lo transcribirá, traducirá si corresponde y luego lo eliminará del bucket.
+- Se guardará un registro en Appwrite con `user_id`, `tipo`, `idioma` y `fecha_hora`.
+- La transcripción (`transcription`) y la traducción (`translation`) se devuelven en la respuesta pero **no se guardan** en la base de datos.
 
 ---
 
@@ -89,12 +103,13 @@ export $(cat .env | xargs)  # Linux/macOS
 python main.py
 ```
 
-Esto levantará un servidor local (si adaptas main.py a Flask para pruebas).
+> Para pruebas locales, necesitarías adaptar `main.py` a un servidor Flask u otra interfaz HTTP.
 
 ---
 
 ## Notas
 
-- La función **guarda solo** los campos definidos en la colección `historial` de Appwrite: `user_id`, `tipo`, `idioma`, `fecha_hora`.
-- `transcription` y `translation` se envían en la respuesta, pero **no se guardan** en la base de datos.
 - `tipo`: `"es"` = transcripción, `"en"` = transcripción + traducción.
+- Los archivos se eliminan automáticamente del bucket tras procesarse.
+- Los modelos de Groq se pueden configurar desde `.env`.
+- Mantén las variables de entorno seguras y no compartas tus claves ni IDs reales.
